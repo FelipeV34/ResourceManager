@@ -24,8 +24,8 @@ class Technician(models.Model):
     """Technician database model."""
     name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
-    id_number = models.CharField(max_length=255)
-    code = models.CharField(max_length=255, validators=[letter_number_only_validator])
+    id_number = models.CharField(unique=True, max_length=255)
+    code = models.CharField(unique=True, max_length=255, validators=[letter_number_only_validator])
     description = models.TextField(null=True, blank=True)
     resource_quantity = models.SmallIntegerField(default=0, validators=[MinValueValidator(0)])
     creation_date = models.DateField(auto_now_add=True)
