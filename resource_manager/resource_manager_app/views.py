@@ -25,6 +25,8 @@ class TechnicianViewSet(ModelViewSet):
     filter_backends = (SearchFilter,)
     search_fields = ("name", "last_name", "id_number", "code",)
 
+    http_method_names = ["get", "put", "patch", "delete", "head", "options", "trace"]
+
 
 class CreateTechnicanApiView(CreateAPIView):
     """
@@ -50,7 +52,6 @@ class CreateTechnicanApiView(CreateAPIView):
             branch_office=BranchOffice.objects.get(pk=serializer["branch_office"].value),  # noqa
             resource_quantity=sum([item["quantity"] for item in serializer["assigned_resources"].value])
         )
-        assignments = []
 
         try:
             new_technician.save()
@@ -61,8 +62,8 @@ class CreateTechnicanApiView(CreateAPIView):
                     resource=Resource.objects.get(pk=resource_serializer["id"])  # noqa
                 )
                 assignment.save()
-                assignments.append(assignment)
-        except Exception:  # noqa
+
+        except Exception:
             if new_technician.pk is not None:
                 new_technician.delete()
             raise ValidationError("The given body may contain errors.")
@@ -99,13 +100,24 @@ class ResourceAssignmentViewSet(ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         """Updates a technician's quantities before updating."""
+        new_quantity = int(request.data["quantity"])
+        if new_quantity < 1 or new_quantity > 10:
+            raise ValidationError("Invalid quantity.")
+
         assignment = ResourceAssignment.objects.get(pk=kwargs["pk"])  # noqa
         previous_technician = Technician.objects.get(pk=assignment.technician.pk)  # noqa
         new_technician = Technician.objects.get(pk=request.data["technician"])  # noqa
-        assignment_quantity = assignment.quantity
-        if previous_technician.resource_quantity - assignment_quantity < 1:
+
+        previous_quantity = assignment.quantity
+        if previous_technician == new_technician:
+            previous_technician.resource_quantity += new_quantity - previous_quantity
+            previous_technician.save()
+            return super().update(request, *args, **kwargs)
+
+        if previous_technician.resource_quantity - previous_quantity < 1:
             raise ValidationError("Technicians cannot have 0 resources assigned.")
-        previous_technician.resource_quantity -= assignment_quantity
+
+        previous_technician.resource_quantity -= previous_quantity
         new_technician.resource_quantity += int(request.data["quantity"])
         previous_technician.save()
         new_technician.save()
